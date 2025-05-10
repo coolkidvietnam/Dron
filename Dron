@@ -1,0 +1,123 @@
+-- CFly: Nút điều khiển bên trái - by trn.minh.tr0089
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local player = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+
+local flying = false
+local speed = 2
+local rotX, rotY = 0, 0
+local camPos = cam.CFrame.Position
+
+local move = {
+	F = false, B = false,
+	L = false, R = false,
+	U = false, D = false
+}
+
+-- GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.ResetOnSpawn = false
+
+-- Nút bật CFly
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 100, 0, 40)
+btn.Position = UDim2.new(0, 20, 1, -60)
+btn.Text = "Bật CFly"
+btn.BackgroundColor3 = Color3.fromRGB(20, 200, 20)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSans
+btn.TextSize = 20
+
+-- Bảng lưu nút điều hướng
+local moveButtons = {}
+
+-- Hàm tạo nút điều khiển
+local function createMoveBtn(text, pos, dir)
+	local b = Instance.new("TextButton", gui)
+	b.Size = UDim2.new(0, 50, 0, 40)
+	b.Position = pos
+	b.Text = text
+	b.Visible = false
+	b.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	b.TextColor3 = Color3.new(1, 1, 1)
+	b.Font = Enum.Font.SourceSans
+	b.TextSize = 18
+	b.MouseButton1Down:Connect(function() move[dir] = true end)
+	b.MouseButton1Up:Connect(function() move[dir] = false end)
+	moveButtons[#moveButtons + 1] = b
+	return b
+end
+
+-- Nút điều hướng bên trái
+createMoveBtn("Tiến",  UDim2.new(0, 95, 1, -160), "F")
+createMoveBtn("Lùi",   UDim2.new(0, 95, 1, -60),  "B")
+createMoveBtn("Trái",  UDim2.new(0, 45, 1, -110), "L")
+createMoveBtn("Phải",  UDim2.new(0, 145, 1, -110),"R")
+
+-- Nút điều hướng sang phải
+createMoveBtn("Lên",   UDim2.new(1, -70, 1, -160), "U")   -- Sang phải, ngang nút "Tiến"
+createMoveBtn("Xuống", UDim2.new(1, -70, 1, -60),  "D")   -- Sang phải, ngang nút "Lùi"
+
+-- Bật/tắt CFly
+btn.MouseButton1Click:Connect(function()
+	flying = not flying
+	btn.Text = flying and "Tắt CFly" or "Bật CFly"
+	btn.BackgroundColor3 = flying and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(20, 200, 20)
+	for _, b in pairs(moveButtons) do
+		b.Visible = flying
+	end
+	if flying then
+		cam.CameraType = Enum.CameraType.Scriptable
+		camPos = cam.CFrame.Position
+	else
+		cam.CameraType = Enum.CameraType.Custom
+	end
+end)
+
+-- Xoay camera cảm ứng
+local dragging = false
+local lastPos
+
+UIS.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		lastPos = input.Position
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.Touch then
+		local delta = input.Position - lastPos
+		rotY = rotY - delta.X * 0.3
+		rotX = math.clamp(rotX - delta.Y * 0.3, -90, 90)
+		lastPos = input.Position
+	end
+end)
+
+-- Di chuyển camera ổn định
+RS.RenderStepped:Connect(function()
+	if flying then
+		-- Tạo phép quay camera không thay đổi vị trí
+		local rot = CFrame.Angles(0, math.rad(rotY), 0) * CFrame.Angles(math.rad(rotX), 0, 0)
+		local dir = Vector3.new()
+
+		if move.F then dir += rot.LookVector * speed end
+		if move.B then dir -= rot.LookVector * speed end
+		if move.L then dir -= rot.RightVector * speed end
+		if move.R then dir += rot.RightVector * speed end
+		if move.U then dir += Vector3.new(0, speed, 0) end
+		if move.D then dir -= Vector3.new(0, speed, 0) end
+
+		-- Cập nhật vị trí camera mà không làm giật
+		camPos = camPos + dir
+		cam.CFrame = CFrame.new(camPos) * rot
+	end
+end)
